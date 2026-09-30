@@ -23,3 +23,9 @@ def test_quote_small_loan():
 
 def test_quote_missing_params():
     assert client().get("/api/quote?amount=300000").status_code == 400
+
+
+def test_quote_promo_returns_a_quote():
+    r = client().get("/api/quote?amount=500000&rate=6.5&years=30")
+    assert r.status_code == 200
+    assert r.get_json()["monthly_repayment"] > 0
