@@ -6,9 +6,20 @@ from flask import Flask, jsonify, request
 app = Flask(__name__)
 
 
+PROMO_THRESHOLD = 400_000  # LEND-231: 0.5 points off the rate for loans of $400k+
+PROMO_DISCOUNT = 0.5
+
+
+def effective_rate(amount: float, annual_rate_pct: float) -> float:
+    """Rate used for pricing, in percent (e.g. 6.5 means 6.5%)."""
+    if amount >= PROMO_THRESHOLD:
+        return annual_rate_pct - PROMO_DISCOUNT
+    return annual_rate_pct
+
+
 def monthly_repayment(amount: float, annual_rate_pct: float, years: int) -> float:
     """Standard amortised loan repayment. annual_rate_pct is e.g. 6.5 for 6.5%."""
-    monthly_rate = annual_rate_pct / 100 / 12
+    monthly_rate = effective_rate(amount, annual_rate_pct) / 12
     n = years * 12
     if monthly_rate == 0:
         return round(amount / n, 2)
