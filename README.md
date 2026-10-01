@@ -29,14 +29,64 @@ Known-good result before the promo PR: `{"monthly_repayment":3160.34}`
 4. All code changes go through a Pull Request. Hotfix branches are named `hotfix/<description>`.
 
 ## Setup (before the incident — not part of the exercise)
-1. **Fork** this repo. **Untick "Copy the `main` branch only"** — you need the `prod` branch. In your fork open the *Actions* tab and enable workflows.
-2. Build the production environment with the Terraform in <https://github.com/eddiez0719/loan-api-lab-infra> (follow its README). It gives you `<PROD_ALB_DNS>` and the values for the GitHub Environment variables.
-3. In your fork create the GitHub Environment **`production`** and add the variables from the Terraform output: `AWS_REGION`, `AWS_ROLE_ARN`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`, `BASE_URL`.
-4. Replace `<ACCOUNT_ID>` in `.aws/task-definition.json` with your 12-digit AWS account id. Make this one small "setup" commit on **both** `main` and `prod` (same change). It is not part of the incident; ignore it when you read `git log main..prod` below.
-5. **Start the incident:** Actions → `loan-api CI/CD` → *Run workflow* → **Use workflow from: `prod`**. Wait until it finishes. Production now runs the promo release. Note the time — your clock starts when you first see wrong quotes.
-6. When the lesson is over, run `terraform destroy` (the environment costs money while it runs).
 
-> Tip: `git diff main..prod` also shows README differences if you are reading this on a different branch. Use `git diff main..prod -- app.py tests/` to see only the code changes.
+> **Cost:** the ALB and a Fargate task bill by the hour. Apply only during the lesson and always run `terraform destroy` afterwards.
+
+**Prerequisites:** GitHub account; Git, Python 3.12+, curl, Docker; Terraform 1.5+; AWS CLI configured for the lab account (`aws sts get-caller-identity` works) with permission to create ECR, ECS, ALB, security groups and IAM roles in `ap-southeast-2`.
+
+### Step 1 – Fork and clone
+1. Click **Fork** on this repo. **Untick "Copy the `main` branch only"** — you need the `prod` branch.
+2. In your fork open the *Actions* tab and enable workflows.
+3. Clone your fork:
+```
+git clone https://github.com/<your-user>/loan-api-lab.git
+cd loan-api-lab
+git branch -r        # you must see origin/main and origin/prod
+```
+
+### Step 2 – Build production with Terraform (folder `terraform/`, on `main`)
+```
+git checkout main
+cd terraform
+terraform init
+terraform apply -var github_repo=<your-user>/loan-api-lab
+```
+If your AWS account already has the GitHub OIDC provider and apply fails with "already exists":
+```
+terraform apply -var github_repo=<your-user>/loan-api-lab -var create_github_oidc_provider=false
+```
+Then collect the values:
+```
+terraform output prod_alb_dns
+terraform output github_environment_variables
+```
+
+### Step 3 – Configure GitHub
+In your fork: *Settings → Environments → New environment* → **`production`**. Under *Environment variables* (not secrets) add: `AWS_REGION`, `AWS_ROLE_ARN`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`, `BASE_URL` (from the Terraform output).
+
+### Step 4 – Put your AWS account ID into the task definition
+Get it with `aws sts get-caller-identity --query Account --output text`. In `.aws/task-definition.json` replace `<ACCOUNT_ID>` with it. Make the same small "setup" commit on **both** branches:
+```
+git checkout main
+# edit .aws/task-definition.json
+git commit -am "setup: account id" && git push origin main
+git checkout prod
+# make the same edit
+git commit -am "setup: account id" && git push origin prod
+```
+It is not part of the incident; ignore these commits when you read `git log main..prod` below.
+
+### Step 5 – Start the incident
+Actions → `loan-api CI/CD` → *Run workflow* → **Use workflow from: `prod`**. Wait until it finishes. Production now runs the promo release. Note the time — your clock starts when you first see wrong quotes:
+```
+curl -s "http://<PROD_ALB_DNS>/api/quote?amount=500000&rate=6.5&years=30"
+```
+You are now the on-call engineer. Continue with LAB-1.
+
+### When the lesson is over
+Run `terraform destroy` in the `terraform/` folder with the same `-var` flags you used for apply.
+
+> Tip: to see what the promo PR changed, use the three-dot diff `git diff main...prod` (changes on `prod` since it left `main`). The two-dot form also lists files that exist only on `main` (like `terraform/`).
 
 ---
 
@@ -64,7 +114,7 @@ Next update: HH:MM
 **As** the on-call engineer, **I want** to reproduce the bug locally, **so that** I know which change caused it.
 
 - [ ] You created `hotfix/quote-rate-calc` from the current **`prod`** branch.
-- [ ] `git diff main..prod -- app.py tests/` shows the lines changed by the promo PR; you pasted them in your notes.
+- [ ] `git diff main...prod` shows the lines changed by the promo PR; you pasted them in your notes.
 - [ ] You ran the app locally from your branch and reproduced the wrong quote.
 - [ ] `make test` passes. You wrote 3 sentences: what broke, why tests and the pipeline did not catch it, and what the correct results should be.
 
