@@ -37,7 +37,8 @@ Known-good result before the promo PR: `{"monthly_repayment":3160.34}`
 ### Step 1 – Fork and clone
 1. Click **Fork** on this repo. **Untick "Copy the `main` branch only"** — you need the `prod` branch.
 2. In your fork open the *Actions* tab and enable workflows.
-3. Clone your fork:
+3. Ignore any branches named `archive-*` — they are leftovers from preparing the lab. You only need `main` and `prod`.
+4. Clone your fork:
 ```
 git clone https://github.com/<your-user>/loan-api-lab.git
 cd loan-api-lab
